@@ -21,14 +21,17 @@ var (
 	Green  Color = "Green"
 )
 
-var Sets = map[Color]Task{}
-
 const dataUrl = "dialhabittracker.dat"
 
 type MainWindow struct {
 	app.Compo
 	SelectedTab Color
 	CanUpdate   bool
+	Tasks       map[Color][]Task
+	Armed       struct {
+		C Color
+		I int
+	}
 }
 
 func (m *MainWindow) OnAppUpdate(ctx app.Context) {
@@ -38,12 +41,17 @@ func (m *MainWindow) OnAppUpdate(ctx app.Context) {
 
 var _ app.AppUpdater = (*MainWindow)(nil)
 
+const stateKeySelectedTab = "selected-tab"
+const stateKeyTaskList = "task-list"
+const stateKeyArmed = "armed"
+
 func (m *MainWindow) OnMount(ctx app.Context) {
-	ctx.ObserveState("selected-tab").Value(&m.SelectedTab)
+	ctx.ObserveState(stateKeySelectedTab).Value(&m.SelectedTab)
 	if m.SelectedTab == "" {
 		m.SelectedTab = Red
 	}
-	println(m.SelectedTab)
+	ctx.ObserveState(stateKeyTaskList).Value(&m.Tasks)
+	ctx.ObserveState(stateKeyArmed).Value(&m.Armed)
 }
 
 func (m *MainWindow) Render() app.UI {
@@ -59,16 +67,48 @@ func (m *MainWindow) Render() app.UI {
 			DataSet("bs-toggle", "tab").
 			DataSet("bs-target", "#"+string(color)+"-tab-pane").
 			OnClick(func(ctx app.Context, e app.Event) {
-				m.SelectedTab = Color(ctx.JSSrc().Get("dataset").Get("color").String())
-				ctx.SetState("selected-tab", m.SelectedTab, app.Persist)
+				ctx.SetState(
+					stateKeySelectedTab,
+					Color(ctx.JSSrc().Get("dataset").Get("color").String()),
+					app.Persist)
 				m.Update()
 			})
 
-		pane := app.Div().
+		pane := app.Div().Class("d-grid", "gap-2", "mt-1")
+
+		var tasks []app.UI
+
+		for i, task := range m.Tasks[color] {
+			tasks = append(tasks, app.Button().
+				Class("btn", "btn-outline-secondary", "col-sm").
+				Body(
+					app.Text(task.Label),
+					app.Button().
+						DataSet("color", color).
+						DataSet("index", i).
+						Class("btn", "btn-outline-danger", "float-end").
+						OnClick(m.deleteTask).
+						Body(
+							app.If(m.Armed.C == color && m.Armed.I == i, icon("delete", "Delete?")),
+							app.If(m.Armed.C != color || m.Armed.I != i, icon("delete", "")),
+						)))
+		}
+
+		tasks = append(tasks,
+			app.Button().
+				Type("button").
+				Class("btn", "btn-primary", "col-sm").
+				Body(icon("add_task", "Add New Task")).
+				DataSet("bs-toggle", "modal").
+				DataSet("bs-target", "#taskModal"))
+
+		pane = pane.Body(tasks...)
+
+		pane = app.Div().
 			Class("tab-pane", "fade").
 			ID(string(color) + "-tab-pane").
 			Role("tabpanel").
-			Text("herein lies " + color + " data.")
+			Body(pane)
 
 		if m.SelectedTab == color {
 			tab = tab.Class("active")
@@ -82,7 +122,9 @@ func (m *MainWindow) Render() app.UI {
 	doc := app.Div().
 		Body(
 			app.Nav().Class("navbar", "navbar-expand-lg", "bg-light").Body(
-				app.A().Class("navbar-brand").Href("#").Text("Dial Habit Tracker")),
+				app.Div().Class("container-xxl").Body(
+					app.A().Class("navbar-brand").Href("#").Body(
+						icon("done_all", "Dial Habit Tracker")))),
 			app.Div().Class("container").Body(
 				app.If(m.CanUpdate, app.Div().Class("alert", "alert-warning").Role("alert").Body(
 					app.Span().
@@ -93,9 +135,19 @@ func (m *MainWindow) Render() app.UI {
 						Text("Reload").
 						OnClick(func(ctx app.Context, e app.Event) { ctx.Reload() }))),
 				app.Ul().Class("nav", "justify-content-center", "nav-tabs").Body(tabs...),
-				app.Div().Class("tab-content").Body(panes...)))
+				app.Div().Class("tab-content").Body(panes...)),
+			m.taskModal())
 
 	return doc
+}
+
+func icon(name string, label string) app.UI {
+	container := app.Div().Class("d-flex", "align-items-center")
+	return container.Body(
+		app.Span().
+			Class("material-icons").
+			Text(name),
+		app.If(label != "", app.Span().Style("margin-left", ".5em").Text(label)))
 }
 
 func main() {
@@ -114,6 +166,7 @@ func main() {
 			"/web/js/bootstrap.bundle.min.js",
 		},
 		Styles: []string{
+			"https://fonts.googleapis.com/icon?family=Material+Icons",
 			"/web/css/bootstrap.min.css",
 		},
 	})
