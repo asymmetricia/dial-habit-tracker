@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
 )
@@ -30,20 +32,55 @@ func (m *MainWindow) deleteTask(ctx app.Context, e app.Event) {
 }
 
 func (m *MainWindow) saveTask(ctx app.Context, e app.Event) {
+	e.PreventDefault()
+
 	if m.Tasks == nil {
 		m.Tasks = map[Color][]Task{}
 	}
 
-	m.Tasks[m.SelectedTab] = append(m.Tasks[m.SelectedTab],
-		Task{Label: app.Window().GetElementByID("addTaskDescription").Get("value").String()})
+	desc := app.Window().GetElementByID(taskModalDescriptionId)
+	newTask := desc.Get("value").String()
+	newTask = strings.TrimSpace(newTask)
+
+	var err error
+	if len(newTask) == 0 {
+		err = fmt.Errorf("Please provide a short task description!")
+	}
+
+	if err == nil {
+		for _, t := range m.Tasks[m.SelectedTab] {
+			if strings.ToLower(t.Label) == strings.ToLower(newTask) {
+				err = fmt.Errorf("Please provide a task description that is unique!")
+				break
+			}
+		}
+	}
+
+	if err != nil {
+		desc.Call("setCustomValidity", err.Error())
+		app.Window().GetElementByID(taskModalValidationErrorId).Set("innerText", err.Error())
+		app.Window().GetElementByID(taskModalFormId).Get("classList").Call("add", "was-validated")
+		return
+	}
+
+	desc.Call("setCustomValidity", "")
+	desc.Set("value", "")
+	app.Window().GetElementByID(taskModalFormId).Get("classList").Call("remove", "was-validated")
+
+	m.Tasks[m.SelectedTab] = append(m.Tasks[m.SelectedTab], Task{Label: newTask})
 	ctx.SetState(stateKeyTaskList, m.Tasks, app.Persist)
-	e.PreventDefault()
 	m.Update()
+	app.Window().Get("bootstrap").Get("Modal").Call("getOrCreateInstance", "#"+taskModalId).Call("hide")
 }
+
+const taskModalId = "task-modal"
+const taskModalDescriptionId = "task-modal-description"
+const taskModalFormId = "task-modal-form"
+const taskModalValidationErrorId = "task-modal-validation-error"
 
 func (m *MainWindow) taskModal() app.UI {
 	return app.Div().Class("modal", "fade").
-		ID("taskModal").
+		ID(taskModalId).
 		TabIndex(-1).
 		Role("dialog").
 		Aria("labelledby", "taskModalLabel").
@@ -58,19 +95,25 @@ func (m *MainWindow) taskModal() app.UI {
 						Aria("label", "close").
 						Body(icon("close", ""))),
 				app.Div().Class("modal-body").Body(
-					app.Form().OnSubmit(m.saveTask).Body(
-						app.Label().
-							Class("form-label").
-							For("addTaskDescription").
-							Text("Task Description"),
-						app.Input().
-							Class("form-control").
-							ID("addTaskDescription").
-							Placeholder("What would you like to work on?")),
-					app.Button().
-						Class("btn", "btn-success", "mt-2").
-						DataSet("bs-dismiss", "modal").
-						DataSet("bs-target", "#taskModal").
-						Body(icon("done", "Save Task")).
-						OnClick(m.saveTask)))))
+					app.Form().
+						ID(taskModalFormId).
+						OnSubmit(m.saveTask).
+						Body(
+							app.Label().
+								Class("form-label").
+								For(taskModalDescriptionId).
+								Text("Task Description"),
+							app.Input().
+								Class("form-control").
+								ID(taskModalDescriptionId).
+								Placeholder("What would you like to work on?").
+								Required(true),
+							app.Div().
+								Class("invalid-feedback").
+								ID(taskModalValidationErrorId).
+								Text("Please provide a short description of your new task!"),
+							app.Button().
+								Class("btn", "btn-success", "mt-2").
+								Body(icon("done", "Save Task")).
+								OnClick(m.saveTask))))))
 }

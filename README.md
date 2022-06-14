@@ -1,7 +1,7 @@
 # TODO
 
 * [x] add entries to dial value lists
-  * [ ] disallow addition of empty task
+  * [x] disallow addition of empty task
 * [ ] persistence to server
   * [ ] offline mode
 * [ ] entries are checkable

@@ -52,6 +52,14 @@ func (m *MainWindow) OnMount(ctx app.Context) {
 	}
 	ctx.ObserveState(stateKeyTaskList).Value(&m.Tasks)
 	ctx.ObserveState(stateKeyArmed).Value(&m.Armed)
+
+	app.Window().GetElementByID(taskModalId).Call(
+		"addEventListener",
+		"shown.bs.modal",
+		app.FuncOf(func(this app.Value, args []app.Value) interface{} {
+			app.Window().GetElementByID(taskModalDescriptionId).Call("focus")
+			return nil
+		}))
 }
 
 func (m *MainWindow) Render() app.UI {
@@ -100,7 +108,7 @@ func (m *MainWindow) Render() app.UI {
 				Class("btn", "btn-primary", "col-sm").
 				Body(icon("add_task", "Add New Task")).
 				DataSet("bs-toggle", "modal").
-				DataSet("bs-target", "#taskModal"))
+				DataSet("bs-target", "#"+taskModalId))
 
 		pane = pane.Body(tasks...)
 
@@ -145,7 +153,7 @@ func icon(name string, label string) app.UI {
 	container := app.Div().Class("d-flex", "align-items-center")
 	return container.Body(
 		app.Span().
-			Class("material-icons").
+			Class("material-icons-outlined").
 			Text(name),
 		app.If(label != "", app.Span().Style("margin-left", ".5em").Text(label)))
 }
@@ -166,7 +174,7 @@ func main() {
 			"/web/js/bootstrap.bundle.min.js",
 		},
 		Styles: []string{
-			"https://fonts.googleapis.com/icon?family=Material+Icons",
+			"/web/css/material-font.css",
 			"/web/css/bootstrap.min.css",
 		},
 	})
