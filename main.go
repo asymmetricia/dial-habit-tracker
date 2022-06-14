@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
 )
@@ -21,8 +22,6 @@ var (
 	Green  Color = "Green"
 )
 
-const dataUrl = "dialhabittracker.dat"
-
 type MainWindow struct {
 	app.Compo
 	SelectedTab Color
@@ -32,6 +31,7 @@ type MainWindow struct {
 		C Color
 		I int
 	}
+	LastVisit time.Time
 }
 
 func (m *MainWindow) OnAppUpdate(ctx app.Context) {
@@ -44,26 +44,81 @@ var _ app.AppUpdater = (*MainWindow)(nil)
 const stateKeySelectedTab = "selected-tab"
 const stateKeyTaskList = "task-list"
 const stateKeyArmed = "armed"
+const stateKeyLastVisit = "last-visit"
 
 func (m *MainWindow) OnMount(ctx app.Context) {
 	ctx.ObserveState(stateKeySelectedTab).Value(&m.SelectedTab)
 	if m.SelectedTab == "" {
-		m.SelectedTab = Red
+		ctx.SetState(stateKeySelectedTab, Red, app.Persist)
 	}
+
 	ctx.ObserveState(stateKeyTaskList).Value(&m.Tasks)
 	ctx.ObserveState(stateKeyArmed).Value(&m.Armed)
+	ctx.ObserveState(stateKeyLastVisit).Value(&m.LastVisit)
 
-	app.Window().GetElementByID(taskModalId).Call(
-		"addEventListener",
-		"shown.bs.modal",
-		app.FuncOf(func(this app.Value, args []app.Value) interface{} {
-			app.Window().GetElementByID(taskModalDescriptionId).Call("focus")
-			return nil
-		}))
+	log.Printf("welcome back! It's been %s since your last visit", time.Since(m.LastVisit).String())
+
+	taskModal := app.Window().GetElementByID(taskModalId)
+	if !taskModal.IsNull() {
+		taskModal.Call(
+			"addEventListener",
+			"shown.bs.modal",
+			app.FuncOf(func(this app.Value, args []app.Value) interface{} {
+				app.Window().GetElementByID(taskModalDescriptionId).Call("focus")
+				return nil
+			}))
+	}
 }
 
 func (m *MainWindow) Render() app.UI {
-	println("rendering")
+	return app.If(
+		m.LastVisit.IsZero(), m.GoodMorning()).
+		Else(m.MainActivity())
+}
+
+func (m *MainWindow) GoodMorning() app.UI {
+	var greeting app.HTMLDiv
+	if time.Now().Hour() < 12 {
+		greeting = symbol("clear_day", "Good morning! You look nice today.")
+	} else if time.Now().Hour() < 17 {
+		greeting = symbol("schedule", "Good afternoon! You look nice today.")
+	} else {
+		greeting = symbol("nights_stay", "Good evening! You look nice today.")
+	}
+
+	colors := [][3]string{
+		{"Red", "brightness_3", "btn-danger"},
+		{"Orange", "brightness_4", "btn-dht-orange"},
+		{"Yellow", "brightness_5", "btn-warning"},
+		{"Green", "brightness_7", "btn-success"},
+	}
+
+	moodBtn := func(offset int) func(int) app.UI {
+		return func(i int) app.UI {
+			i += offset
+			return app.Button().
+				Class(colors[i][2], "btn", "p-4", "m-2").
+				Body(
+					app.Div().Class("text-center").
+						Text(colors[i][0]),
+					app.Div().Class("material-icons-round").
+						Style("font-size", "4em").
+						Text(colors[i][1]),
+				)
+		}
+	}
+
+	return m.withPreamble(
+		greeting.Class("justify-content-center"),
+		app.H2().Class("text-center").
+			Text("How are you feeling?"),
+		app.Div().Class("d-flex", "flex-wrap", "justify-content-center", "p-2").Body(
+			app.Div().Body(app.Range(colors[0:2]).Slice(moodBtn(0))),
+			app.Div().Body(app.Range(colors[2:]).Slice(moodBtn(2))),
+		))
+}
+
+func (m *MainWindow) MainActivity() app.UI {
 	var tabs []app.UI
 	var panes []app.UI
 	for _, color := range []Color{Red, Orange, Yellow, Green} {
@@ -127,33 +182,51 @@ func (m *MainWindow) Render() app.UI {
 		panes = append(panes, pane)
 	}
 
-	doc := app.Div().
-		Body(
-			app.Nav().Class("navbar", "navbar-expand-lg", "bg-light").Body(
-				app.Div().Class("container-xxl").Body(
-					app.A().Class("navbar-brand").Href("#").Body(
-						icon("done_all", "Dial Habit Tracker")))),
-			app.Div().Class("container").Body(
-				app.If(m.CanUpdate, app.Div().Class("alert", "alert-warning").Role("alert").Body(
-					app.Span().
-						Text("Update available!").
-						Style("margin-right", "1em"),
-					app.Button().
-						Class("btn", "btn-success").
-						Text("Reload").
-						OnClick(func(ctx app.Context, e app.Event) { ctx.Reload() }))),
-				app.Ul().Class("nav", "justify-content-center", "nav-tabs").Body(tabs...),
-				app.Div().Class("tab-content").Body(panes...)),
-			m.taskModal())
+	doc := m.withPreamble(
+		app.Ul().Class("nav", "justify-content-center", "nav-tabs").Body(tabs...),
+		app.Div().Class("tab-content").Body(panes...),
+		m.taskModal())
 
 	return doc
 }
 
-func icon(name string, label string) app.UI {
+func (m *MainWindow) withPreamble(body ...app.UI) app.UI {
+	return app.Div().Body(
+		append([]app.UI{
+			app.Nav().Class("navbar", "navbar-expand-lg", "bg-light").Body(
+				app.Div().Class("container-xxl").Body(
+					app.A().Class("navbar-brand").Href("#").Body(
+						icon("done_all", "Dial Habit Tracker")))),
+			app.If(m.CanUpdate,
+				app.Div().Class("container").Body(
+					app.Div().Class("alert", "alert-warning", "row", "justify-content-md-center", "align-items-center").
+						Role("alert").
+						Body(
+							app.Div().Class("col-md-2").Body(
+								symbol("update", "Update available!"),
+							), app.Div().Class("col-md-2").Body(
+								app.Button().
+									Class("btn", "btn-success").
+									Text("Reload").
+									OnClick(func(ctx app.Context, e app.Event) { ctx.Reload() }))))),
+		},
+			body...)...)
+}
+
+func symbol(name string, label string) app.HTMLDiv {
 	container := app.Div().Class("d-flex", "align-items-center")
 	return container.Body(
 		app.Span().
-			Class("material-icons-outlined").
+			Class("material-symbols-rounded").
+			Text(name),
+		app.If(label != "", app.Span().Style("margin-left", ".5em").Text(label)))
+}
+
+func icon(name string, label string) app.HTMLDiv {
+	container := app.Div().Class("d-flex", "align-items-center")
+	return container.Body(
+		app.Span().
+			Class("material-icons-round").
 			Text(name),
 		app.If(label != "", app.Span().Style("margin-left", ".5em").Text(label)))
 }
@@ -166,6 +239,7 @@ func main() {
 		Name:            "Dial Habit Tracker",
 		ShortName:       "DialHabit",
 		Author:          "Tricia Bogen (@tricia@tech.lgbt)",
+		Title:           "Dial Habit Tracker is a tool for tracking habits using the Dial Method",
 		BackgroundColor: "#000000",
 		Icon: app.Icon{
 			Default: "/web/Icon.png",
@@ -174,7 +248,7 @@ func main() {
 			"/web/js/bootstrap.bundle.min.js",
 		},
 		Styles: []string{
-			"/web/css/material-font.css",
+			"/web/css/dial.css",
 			"/web/css/bootstrap.min.css",
 		},
 	})
