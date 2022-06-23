@@ -1,0 +1,12 @@
+@import "functions";
+@import "variables";
+@import "maps";
+@import "mixins";
+@import "root";
+
+$theme-colors: map-merge( $theme-colors, (
+    "orange": #FF9900,
+    "warning": #FFCC66,
+) );
+
+@import "bootstrap";

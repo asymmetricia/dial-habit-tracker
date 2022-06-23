@@ -5,7 +5,7 @@
     src: url(/web/font/MaterialSymbolsRounded.woff2) format('woff2');
 }
 
-.material-symbols-rounded {
+.material-symbols-round {
     font-family: 'Material Symbols Rounded';
     font-weight: normal;
     font-style: normal;
@@ -43,20 +43,4 @@
     direction: ltr;
     -moz-font-feature-settings: 'liga';
     -moz-osx-font-smoothing: grayscale;
-}
-
-.btn-dht-orange {
-    background-color: var(--bs-orange);
-    --bs-btn-font-weight: 600;
-    --bs-btn-color: var(--bs-white);
-    --bs-btn-bg: var(--bs-orange);
-    --bs-btn-border-color: var(--bs-orange);
-    --bs-btn-border-radius: .5rem;
-    --bs-btn-hover-color: var(--bs-white);
-    --bs-btn-hover-bg: #{shade-color($bs-orange, 10%)};
-    --bs-btn-hover-border-color: #{shade-color($bs-orange, 10%)};
-    --bs-btn-focus-shadow-rgb: var(--bs-orange);
-    --bs-btn-active-color: var(--bs-btn-hover-color);
-    --bs-btn-active-bg: #{shade-color($bs-orange, 20%)};
-    --bs-btn-active-border-color: #{shade-color($bs-orange, 20%)};
 }

@@ -76,6 +76,14 @@ func (m *MainWindow) Render() app.UI {
 		Else(m.MainActivity())
 }
 
+func (m *MainWindow) SelectMood(mood string) app.EventHandler {
+	return func(ctx app.Context, e app.Event) {
+		ctx.SetState(stateKeySelectedTab, Color(mood), app.Persist)
+		ctx.SetState(stateKeyLastVisit, time.Now(), app.Persist)
+		m.Update()
+	}
+}
+
 func (m *MainWindow) GoodMorning() app.UI {
 	var greeting app.HTMLDiv
 	if time.Now().Hour() < 12 {
@@ -87,10 +95,10 @@ func (m *MainWindow) GoodMorning() app.UI {
 	}
 
 	colors := [][3]string{
-		{"Red", "brightness_3", "btn-danger"},
-		{"Orange", "brightness_4", "btn-dht-orange"},
-		{"Yellow", "brightness_5", "btn-warning"},
-		{"Green", "brightness_7", "btn-success"},
+		{"Red", "thunderstorm", "btn-danger"},
+		{"Orange", "rainy", "btn-orange"},
+		{"Yellow", "partly_cloudy_day", "btn-warning"},
+		{"Green", "sunny", "btn-success"},
 	}
 
 	moodBtn := func(offset int) func(int) app.UI {
@@ -101,10 +109,10 @@ func (m *MainWindow) GoodMorning() app.UI {
 				Body(
 					app.Div().Class("text-center").
 						Text(colors[i][0]),
-					app.Div().Class("material-icons-round").
+					app.Div().Class("material-symbols-round").
 						Style("font-size", "4em").
 						Text(colors[i][1]),
-				)
+				).OnClick(m.SelectMood(colors[i][0]))
 		}
 	}
 
@@ -217,7 +225,7 @@ func symbol(name string, label string) app.HTMLDiv {
 	container := app.Div().Class("d-flex", "align-items-center")
 	return container.Body(
 		app.Span().
-			Class("material-symbols-rounded").
+			Class("material-symbols-round").
 			Text(name),
 		app.If(label != "", app.Span().Style("margin-left", ".5em").Text(label)))
 }
