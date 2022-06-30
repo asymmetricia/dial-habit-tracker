@@ -8,11 +8,6 @@ import (
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
 )
 
-type Task struct {
-	Label string
-	Done  bool
-}
-
 type Color string
 
 var (
@@ -150,19 +145,7 @@ func (m *MainWindow) MainActivity() app.UI {
 		var tasks []app.UI
 
 		for i, task := range m.Tasks[color] {
-			tasks = append(tasks, app.Button().
-				Class("btn", "btn-outline-secondary", "col-sm").
-				Body(
-					app.Text(task.Label),
-					app.Button().
-						DataSet("color", color).
-						DataSet("index", i).
-						Class("btn", "btn-outline-danger", "float-end").
-						OnClick(m.deleteTask).
-						Body(
-							app.If(m.Armed.C == color && m.Armed.I == i, icon("delete", "Delete?")),
-							app.If(m.Armed.C != color || m.Armed.I != i, icon("delete", "")),
-						)))
+			tasks = append(tasks, task.Render(i, m))
 		}
 
 		tasks = append(tasks,
@@ -260,6 +243,6 @@ func main() {
 			"/web/css/bootstrap.min.css",
 		},
 	})
-	log.Print("Starting up!")
+	log.Print("Starting up! Listening on port 8000.")
 	log.Fatal(http.ListenAndServe(":8000", nil))
 }

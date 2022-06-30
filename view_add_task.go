@@ -67,7 +67,7 @@ func (m *MainWindow) saveTask(ctx app.Context, e app.Event) {
 	desc.Set("value", "")
 	app.Window().GetElementByID(taskModalFormId).Get("classList").Call("remove", "was-validated")
 
-	m.Tasks[m.SelectedTab] = append(m.Tasks[m.SelectedTab], Task{Label: newTask})
+	m.Tasks[m.SelectedTab] = append(m.Tasks[m.SelectedTab], Task{Label: newTask, Color: m.SelectedTab})
 	ctx.SetState(stateKeyTaskList, m.Tasks, app.Persist)
 	m.Update()
 	app.Window().Get("bootstrap").Get("Modal").Call("getOrCreateInstance", "#"+taskModalId).Call("hide")
