@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
@@ -21,12 +22,10 @@ type MainWindow struct {
 	app.Compo
 	SelectedTab Color
 	CanUpdate   bool
-	Tasks       map[Color][]Task
-	Armed       struct {
-		C Color
-		I int
-	}
-	LastVisit time.Time
+	Tasks       map[int]*Task
+	Armed       int
+	LastVisit   time.Time
+	NextId      int
 }
 
 func (m *MainWindow) OnAppUpdate(ctx app.Context) {
@@ -40,6 +39,7 @@ const stateKeySelectedTab = "selected-tab"
 const stateKeyTaskList = "task-list"
 const stateKeyArmed = "armed"
 const stateKeyLastVisit = "last-visit"
+const stateKeyNextId = "next-id"
 
 func (m *MainWindow) OnMount(ctx app.Context) {
 	ctx.ObserveState(stateKeySelectedTab).Value(&m.SelectedTab)
@@ -50,6 +50,11 @@ func (m *MainWindow) OnMount(ctx app.Context) {
 	ctx.ObserveState(stateKeyTaskList).Value(&m.Tasks)
 	ctx.ObserveState(stateKeyArmed).Value(&m.Armed)
 	ctx.ObserveState(stateKeyLastVisit).Value(&m.LastVisit)
+	ctx.ObserveState(stateKeyNextId).Value(&m.NextId)
+
+	if m.NextId == 0 {
+		ctx.SetState(stateKeyNextId, 1, app.Persist)
+	}
 
 	log.Printf("welcome back! It's been %s since your last visit", time.Since(m.LastVisit).String())
 
@@ -80,7 +85,7 @@ func (m *MainWindow) SelectMood(mood string) app.EventHandler {
 }
 
 func (m *MainWindow) GoodMorning() app.UI {
-	var greeting app.HTMLDiv
+	var greeting app.UI
 	if time.Now().Hour() < 12 {
 		greeting = symbol("clear_day", "Good morning! You look nice today.")
 	} else if time.Now().Hour() < 17 {
@@ -112,7 +117,7 @@ func (m *MainWindow) GoodMorning() app.UI {
 	}
 
 	return m.withPreamble(
-		greeting.Class("justify-content-center"),
+		app.Div().Class("d-flex", "justify-content-center").Body(greeting),
 		app.H2().Class("text-center").
 			Text("How are you feeling?"),
 		app.Div().Class("d-flex", "flex-wrap", "justify-content-center", "p-2").Body(
@@ -142,10 +147,17 @@ func (m *MainWindow) MainActivity() app.UI {
 
 		pane := app.Div().Class("d-grid", "gap-2", "mt-1")
 
-		var tasks []app.UI
+		var taskIds []int
+		for _, task := range m.Tasks {
+			if task.Color == color {
+				taskIds = append(taskIds, task.Id)
+			}
+		}
+		sort.Ints(taskIds)
 
-		for i, task := range m.Tasks[color] {
-			tasks = append(tasks, task.Render(i, m))
+		var tasks []app.UI
+		for _, taskId := range taskIds {
+			tasks = append(tasks, m.Tasks[taskId].Render(m))
 		}
 
 		tasks = append(tasks,
@@ -204,22 +216,30 @@ func (m *MainWindow) withPreamble(body ...app.UI) app.UI {
 			body...)...)
 }
 
-func symbol(name string, label string) app.HTMLDiv {
-	container := app.Div().Class("d-flex", "align-items-center")
-	return container.Body(
-		app.Span().
-			Class("material-symbols-round").
-			Text(name),
-		app.If(label != "", app.Span().Style("margin-left", ".5em").Text(label)))
-}
-
-func icon(name string, label string) app.HTMLDiv {
-	container := app.Div().Class("d-flex", "align-items-center")
-	return container.Body(
+func symbol(name string, label string) app.UI {
+	if label == "" {
+		return app.Span().Class("material-symbols-round").Text(name)
+	}
+	return app.Div().Class("d-flex", "align-items-center").Body(
 		app.Span().
 			Class("material-icons-round").
 			Text(name),
-		app.If(label != "", app.Span().Style("margin-left", ".5em").Text(label)))
+		app.Span().
+			Style("margin-left", ".5em").
+			Text(label))
+}
+
+func icon(name string, label string) app.UI {
+	if label == "" {
+		return app.Span().Class("material-icons-round").Text(name)
+	}
+	return app.Div().Class("d-flex", "align-items-center").Body(
+		app.Span().
+			Class("material-icons-round").
+			Text(name),
+		app.Span().
+			Style("margin-left", ".5em").
+			Text(label))
 }
 
 func main() {

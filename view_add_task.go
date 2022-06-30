@@ -2,40 +2,16 @@ package main
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/maxence-charriere/go-app/v9/pkg/app"
 )
 
-func (m *MainWindow) deleteTask(ctx app.Context, e app.Event) {
-	color := Color(ctx.JSSrc().Get("dataset").Get("color").String())
-	indexStr := ctx.JSSrc().Get("dataset").Get("index").String()
-
-	index, err := strconv.Atoi(indexStr)
-	if err != nil {
-		return
-	}
-
-	if m.Armed.C != color || m.Armed.I != index {
-		m.Armed.C = color
-		m.Armed.I = index
-		ctx.SetState(stateKeyArmed, m.Armed)
-	} else {
-		m.Tasks[color] = append(m.Tasks[color][:index], m.Tasks[color][index+1:]...)
-		ctx.SetState(stateKeyTaskList, m.Tasks, app.Persist)
-		m.Armed.C = ""
-		ctx.SetState(stateKeyArmed, m.Armed)
-	}
-
-	m.Update()
-}
-
 func (m *MainWindow) saveTask(ctx app.Context, e app.Event) {
 	e.PreventDefault()
 
 	if m.Tasks == nil {
-		m.Tasks = map[Color][]Task{}
+		m.Tasks = map[int]*Task{}
 	}
 
 	desc := app.Window().GetElementByID(taskModalDescriptionId)
@@ -48,8 +24,8 @@ func (m *MainWindow) saveTask(ctx app.Context, e app.Event) {
 	}
 
 	if err == nil {
-		for _, t := range m.Tasks[m.SelectedTab] {
-			if strings.ToLower(t.Label) == strings.ToLower(newTask) {
+		for _, t := range m.Tasks {
+			if t.Color == m.SelectedTab && strings.ToLower(t.Label) == strings.ToLower(newTask) {
 				err = fmt.Errorf("Please provide a task description that is unique!")
 				break
 			}
@@ -67,7 +43,9 @@ func (m *MainWindow) saveTask(ctx app.Context, e app.Event) {
 	desc.Set("value", "")
 	app.Window().GetElementByID(taskModalFormId).Get("classList").Call("remove", "was-validated")
 
-	m.Tasks[m.SelectedTab] = append(m.Tasks[m.SelectedTab], Task{Label: newTask, Color: m.SelectedTab})
+	task := &Task{Label: newTask, Color: m.SelectedTab, Id: m.NextId}
+	m.Tasks[task.Id] = task
+	ctx.SetState(stateKeyNextId, m.NextId+1, app.Persist)
 	ctx.SetState(stateKeyTaskList, m.Tasks, app.Persist)
 	m.Update()
 	app.Window().Get("bootstrap").Get("Modal").Call("getOrCreateInstance", "#"+taskModalId).Call("hide")
