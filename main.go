@@ -80,6 +80,17 @@ func (m *MainWindow) SelectMood(mood string) app.EventHandler {
 	return func(ctx app.Context, e app.Event) {
 		ctx.SetState(stateKeySelectedTab, Color(mood), app.Persist)
 		ctx.SetState(stateKeyLastVisit, time.Now(), app.Persist)
+		for _, task := range m.Tasks {
+			task.Done = false
+		}
+		ctx.SetState(stateKeyTaskList, m.Tasks, app.Persist)
+		m.Update()
+	}
+}
+
+func (m *MainWindow) ResetDay() app.EventHandler {
+	return func(ctx app.Context, e app.Event) {
+		ctx.SetState(stateKeyLastVisit, time.Time{}, app.Persist)
 		m.Update()
 	}
 }
@@ -186,34 +197,75 @@ func (m *MainWindow) MainActivity() app.UI {
 	}
 
 	doc := m.withPreamble(
-		app.Ul().Class("nav", "justify-content-center", "nav-tabs").Body(tabs...),
-		app.Div().Class("tab-content").Body(panes...),
-		m.taskModal())
+		app.Div().Class("container-xxl").Body(
+			app.Ul().Class("nav", "justify-content-center", "nav-tabs").Body(tabs...),
+			app.Div().Class("tab-content").Body(panes...),
+			m.taskModal(),
+			m.DebugMenu()))
 
 	return doc
 }
 
+func (m *MainWindow) DebugMenu() app.UI {
+	return app.Div().
+		Class("btn-group", "dropup", "fixed-bottom", "float-right").
+		Body(
+			app.Button().
+				Class("btn", "dropdown-toggle").
+				DataSet("bs-toggle", "dropdown").
+				Aria("expanded", "false").
+				Body(icon("bug_report")),
+			app.Div().
+				Class("dropdown-menu").
+				Body(
+					app.Div().Class("dropdown-item").Text("test")))
+}
+
 func (m *MainWindow) withPreamble(body ...app.UI) app.UI {
-	return app.Div().Body(
-		append([]app.UI{
-			app.Nav().Class("navbar", "navbar-expand-lg", "bg-light").Body(
-				app.Div().Class("container-xxl").Body(
-					app.A().Class("navbar-brand").Href("#").Body(
-						icon("done_all", "Dial Habit Tracker")))),
-			app.If(m.CanUpdate,
-				app.Div().Class("container").Body(
-					app.Div().Class("alert", "alert-warning", "row", "justify-content-md-center", "align-items-center").
-						Role("alert").
-						Body(
-							app.Div().Class("col-md-2").Body(
-								symbol("update", "Update available!"),
-							), app.Div().Class("col-md-2").Body(
-								app.Button().
-									Class("btn", "btn-success").
-									Text("Reload").
-									OnClick(func(ctx app.Context, e app.Event) { ctx.Reload() }))))),
-		},
-			body...)...)
+	return app.Div().
+		Body(
+			append([]app.UI{
+				app.Nav().Class("navbar", "navbar-expand-sm", "bg-light").Body(
+					app.Div().Class("container-xxl").Body(
+						app.A().Href("#").Class("navbar-brand", "me-auto").Body(
+							icon("done_all", "Dial Habit Tracker")),
+						app.Button().
+							Class("navbar-toggler").
+							DataSet("bs-toggle", "collapse").
+							DataSet("bs-target", "#navbarCollapse").
+							Aria("controls", "navbarCollapse").
+							Aria("expanded", "false").
+							Aria("label", "toggle navigation").
+							Body(icon("more")),
+						app.Div().Class("collapse", "navbar-collapse").ID("navbarCollapse").Body(
+							app.Ul().Class("navbar-nav", "ms-auto").Body(
+								app.Li().Class("nav-item", "dropdown").Body(
+									app.A().Href("#").
+										Class("nav-link", "dropdown-toggle").
+										DataSet("bs-toggle", "dropdown").
+										Aria("expanded", "false").
+										Text("Debug"),
+									app.Ul().Class("dropdown-menu", "dropdown-menu-end").Body(
+										app.Li().Body(
+											app.A().Href("#").
+												Class("dropdown-item").
+												Text("Reset Day"))).OnClick(m.ResetDay()),
+								))),
+					)),
+				app.If(m.CanUpdate,
+					app.Div().Class("container").Body(
+						app.Div().Class("alert", "alert-warning", "row", "justify-content-md-center", "align-items-center").
+							Role("alert").
+							Body(
+								app.Div().Class("col-md-2").Body(
+									symbol("update", "Update available!"),
+								), app.Div().Class("col-md-2").Body(
+									app.Button().
+										Class("btn", "btn-success").
+										Text("Reload").
+										OnClick(func(ctx app.Context, e app.Event) { ctx.Reload() }))))),
+			},
+				body...)...)
 }
 
 func symbol(name string, label string) app.UI {
