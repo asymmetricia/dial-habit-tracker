@@ -72,7 +72,7 @@ func (m *MainWindow) OnMount(ctx app.Context) {
 
 func (m *MainWindow) Render() app.UI {
 	return app.If(
-		m.LastVisit.IsZero(), m.GoodMorning()).
+		m.LastVisit.IsZero() || time.Since(m.LastVisit).Hours() >= 23, m.GoodMorning()).
 		Else(m.MainActivity())
 }
 
@@ -229,8 +229,12 @@ func symbol(name string, label string) app.UI {
 			Text(label))
 }
 
-func icon(name string, label string) app.UI {
-	if label == "" {
+// icon generates an [app.UI] element for the [Material Icon] named by `name`, with
+// an optional label `label`.
+//
+// [Material Icon]: https://fonts.google.com/icons
+func icon(name string, label ...string) app.UI {
+	if len(label) == 0 {
 		return app.Span().Class("material-icons-round").Text(name)
 	}
 	return app.Div().Class("d-flex", "align-items-center").Body(
@@ -239,7 +243,7 @@ func icon(name string, label string) app.UI {
 			Text(name),
 		app.Span().
 			Style("margin-left", ".5em").
-			Text(label))
+			Text(label[0]))
 }
 
 func main() {
